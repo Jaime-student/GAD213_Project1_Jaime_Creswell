@@ -46,6 +46,10 @@ public class PlayerMovement : MonoBehaviour
 
     public MovementState state;
 
+    public float gravityMultiplier = 0.5f;
+
+    public float jumpForwardForce;
+
     public enum MovementState
     {
         crouching,
@@ -64,26 +68,11 @@ public class PlayerMovement : MonoBehaviour
     private void Update()
     {
         // ground check
-        grounded = Physics.Raycast(transform.position, Vector3.down, playerHeight * 0.5f + 0.3f, whatIsGround);
+        //grounded = Physics.Raycast(transform.position, Vector3.down, playerHeight * 0.5f + 0.3f, whatIsGround);
 
         Time.timeScale = moveSpeed;
 
         transform.Translate(Vector3.forward * Time.deltaTime);
-
-        if (Input.GetKeyDown(KeyCode.D))
-        {
-            ThePlayer.transform.position = TeleportTarget.transform.position;
-        }
-
-        if (Input.GetKeyDown(KeyCode.A))
-        {
-            ThePlayer.transform.position = TeleportTarget2.transform.position;
-        }
-
-        if (Input.GetKeyDown(KeyCode.S))
-        {
-            ThePlayer.transform.position = TeleportTarget3.transform.position;
-        }
 
         MyInput();
         SpeedControl();
@@ -92,17 +81,33 @@ public class PlayerMovement : MonoBehaviour
         if (grounded)
         {
             rb.linearDamping = groundDrag;
+            Debug.Log("Is grounded");
         }
         else
         {
             rb.linearDamping = 0;
         }
+
+        Debug.Log("Current Speed: " + moveSpeed);
     }
 
+    public void OnCollisionStay(Collision collision)
+    {
+        grounded = true;
+    }
+
+    public void OnCollisionExit(Collision collision)
+    {
+        grounded = false;
+    }
     private void FixedUpdate()
     {
         MovePlayer();
-
+        // Apply custom gravity
+        if (!grounded)
+        {
+            rb.AddForce(Physics.gravity * (gravityMultiplier - 1f), ForceMode.Acceleration);
+        }
     }
 
     private void StateHandler()
@@ -117,12 +122,13 @@ public class PlayerMovement : MonoBehaviour
 
     private void MyInput()
     {
-        //horizontalInput = Input.GetAxisRaw("Horizontal");
-        //verticalInput = Input.GetAxisRaw("Vertical");
+        horizontalInput = Input.GetAxisRaw("Horizontal");
+        
 
         // when to jump
-        if (Input.GetKey(jumpKey) && readyToJump && grounded)
+        if (Input.GetKeyDown(KeyCode.Space) && grounded)
         {
+            Debug.Log("Jump has been pressed");
             readyToJump = false;
 
             Jump();
@@ -133,6 +139,7 @@ public class PlayerMovement : MonoBehaviour
         // start crouch
         if (Input.GetKeyDown(crouchKey))
         {
+            Debug.Log("Has crouched");
             transform.localScale = new Vector3(transform.localScale.x, crouchYScale, transform.localScale.z);
             rb.AddForce(Vector3.down * 5f, ForceMode.Impulse);
         }
@@ -151,10 +158,17 @@ public class PlayerMovement : MonoBehaviour
 
         // on ground
         if (grounded)
-            rb.AddForce(moveDirection.normalized * moveSpeed * 10f, ForceMode.Force);
+        {
+            rb.AddForce(moveDirection.normalized * 20f, ForceMode.Acceleration);
+        }
         // in air
         else if (!grounded)
-            rb.AddForce(moveDirection.normalized * moveSpeed * 10f * airMultiplier, ForceMode.Force);
+        {
+            //rb.AddForce(moveDirection.normalized * moveSpeed * 10f * airMultiplier, ForceMode.Force);
+            Vector3 airMove = moveDirection.normalized * moveSpeed * airMultiplier;
+            rb.AddForce(airMove, ForceMode.Acceleration);
+        }
+
 
         if (Input.GetKeyDown(KeyCode.H))
         {
@@ -177,10 +191,17 @@ public class PlayerMovement : MonoBehaviour
 
     private void Jump()
     {
-        // reset y velocity
+        Debug.Log("Has jumped");
+
+        // Reset vertical velocity only
         rb.linearVelocity = new Vector3(rb.linearVelocity.x, 0f, rb.linearVelocity.z);
 
+        // Apply force
         rb.AddForce(transform.up * jumpForce, ForceMode.Impulse);
+
+        // Apply a leap
+        Vector3 forwardForce = orientation.forward * jumpForwardForce * 0.2f;
+        rb.AddForce(forwardForce, ForceMode.Impulse);
     }
     private void ResetJump()
     {
